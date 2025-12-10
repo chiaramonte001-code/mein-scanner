@@ -1,88 +1,92 @@
 import streamlit as st
-import requests
-import pandas as pd
-import time
+from PIL import Image
+from PyPDF2 import PdfMerger
+import io
 
-# --- KONFIGURATION ---
-# Falls die Public API spinnt, nutzen wir hier einen Fallback
-API_URL = "https://api.coingecko.com/api/v3/coins/markets"
+st.set_page_config(page_title="Pro PDF Tools", page_icon="📄")
 
-st.set_page_config(page_title="Crypto Pro", layout="wide")
+# --- 1. LOGIN & PAYWALL ---
+st.sidebar.header("🔒 Premium Zugang")
+passwort = st.sidebar.text_input("Lizenzschlüssel eingeben", type="password")
 
-# --- LOGIN ---
-st.sidebar.title("🔒 Login")
-pw = st.sidebar.text_input("Passwort", type="password")
-
-if pw != "PRO-2025":
-    st.warning("Bitte einloggen.")
+if passwort != "PRO-2025":
+    st.title("📄 Pro PDF Tools")
+    st.warning("🔒 Dieses Tool ist geschützt.")
+    st.markdown("""
+    ### Warum Pro Tools?
+    - 🚀 **Keine Werbung**
+    - 🔒 **100% Sicher** (Daten bleiben privat)
+    - ⚡ **Blitzschnell** (Bilder -> PDF, PDF Merge)
+    
+    👉 **[Lizenzschlüssel für 5 CHF kaufen](https://www.paypal.com/paypalme/DEINNAME/5CHF)**
+    """)
     st.stop()
 
-st.sidebar.success("Eingeloggt")
+# --- 2. DIE APP (Nur für Zahler sichtbar) ---
+st.sidebar.success("✅ Lizenz Aktiv")
+st.title("🛠️ Dein PDF Werkzeugkasten")
 
-# --- HAUPT APP ---
-st.title("🚀 Crypto Scanner Pro")
+option = st.selectbox("Was möchtest du tun?", 
+                      ["Bilder zu PDF konvertieren", "PDFs zusammenfügen (Merger)"])
 
-if st.button("Markt Scannen"):
-    with st.spinner("Lade Daten..."):
-        try:
-            # Wir fragen die API ab
-            params = {
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": 20,
-                "page": 1,
-                "sparkline": "false"
-            }
-            
-            # Timeout wichtig, damit es nicht ewig hängt
-            response = requests.get(API_URL, params=params, timeout=10)
-            
-            # Prüfen: War die Anfrage erfolgreich? (Code 200 = OK)
-            if response.status_code == 200:
-                data = response.json()
+# --- MODUL A: BILDER ZU PDF ---
+if option == "Bilder zu PDF konvertieren":
+    st.subheader("📸 Bilder in 1 PDF umwandeln")
+    uploaded_files = st.file_uploader("Lade Bilder hoch (JPG, PNG)", 
+                                      accept_multiple_files=True, type=["jpg", "jpeg", "png"])
+    
+    if uploaded_files:
+        if st.button("PDF Erstellen"):
+            with st.spinner("Erstelle PDF..."):
+                # Logik: Bilder öffnen und konvertieren
+                image_list = []
+                first_image = None
                 
-                # Prüfen: Haben wir überhaupt eine Liste bekommen?
-                if isinstance(data, list) and len(data) > 0:
-                    
-                    # Wir bauen die Liste manuell auf (sicherer als direkt in Pandas)
-                    clean_list = []
-                    for coin in 
-                        # .get() verhindert Absturz bei fehlenden Werten
-                        name = coin.get('name', 'N/A')
-                        price = coin.get('current_price', 0)
-                        change = coin.get('price_change_percentage_24h', 0)
-                        
-                        # Signal berechnen
-                        signal = "⚪ HALTEN"
-                        if change is not None:
-                            if change < -3: signal = "🟢 KAUFEN"
-                            if change > 3: signal = "🔴 VERKAUFEN"
-                        else:
-                            change = 0 # Fallback
-                            
-                        clean_list.append({
-                            "Coin": name,
-                            "Preis ($)": price,
-                            "Trend (24h)": f"{change:.2f} %",
-                            "Signal": signal
-                        })
-                    
-                    # Jetzt erst Tabelle machen
-                    df = pd.DataFrame(clean_list)
-                    
-                    # Stylen und anzeigen
-                    st.success(f"{len(df)} Coins erfolgreich geladen!")
-                    st.dataframe(df, use_container_width=True)
-                    
-                else:
-                    st.error("API hat keine Daten geschickt (Liste leer).")
-                    st.json(data) # Zeigt uns, was stattdessen ankam
-            
-            elif response.status_code == 429:
-                st.error("Zu viele Anfragen! (Rate Limit). Warte 1 Minute.")
-            else:
-                st.error(f"API Fehler Code: {response.status_code}")
+                for file in uploaded_files:
+                    img = Image.open(file)
+                    img = img.convert('RGB') # Wichtig für PDF Kompatibilität
+                    if first_image is None:
+                        first_image = img
+                    else:
+                        image_list.append(img)
                 
-        except Exception as e:
-            st.error("Ein unerwarteter Fehler ist aufgetreten.")
-            st.write(e)
+                # Speichern im Arbeitsspeicher (RAM)
+                pdf_buffer = io.BytesIO()
+                if first_image:
+                    first_image.save(pdf_buffer, save_all=True, append_images=image_list, format="PDF")
+                    
+                    st.success("Fertig! Dein PDF ist bereit.")
+                    st.download_button(
+                        label="⬇️ PDF Herunterladen",
+                        data=pdf_buffer.getvalue(),
+                        file_name="meine_bilder.pdf",
+                        mime="application/pdf"
+                    )
+
+# --- MODUL B: PDF MERGER ---
+elif option == "PDFs zusammenfügen (Merger)":
+    st.subheader("📑 Mehrere PDFs verbinden")
+    uploaded_pdfs = st.file_uploader("Lade PDFs hoch", 
+                                     accept_multiple_files=True, type="pdf")
+    
+    if uploaded_pdfs:
+        st.write(f"{len(uploaded_pdfs)} Dateien geladen.")
+        
+        if st.button("Zusammenfügen"):
+            with st.spinner("Verbinde Dateien..."):
+                merger = PdfMerger()
+                output_buffer = io.BytesIO()
+                
+                for pdf in uploaded_pdfs:
+                    merger.append(pdf)
+                
+                merger.write(output_buffer)
+                merger.close()
+                
+                st.success("Erfolgreich verbunden!")
+                st.download_button(
+                    label="⬇️ Verbundenes PDF laden",
+                    data=output_buffer.getvalue(),
+                    file_name="komplett.pdf",
+                    mime="application/pdf"
+                )
