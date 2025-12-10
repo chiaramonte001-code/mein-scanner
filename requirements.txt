@@ -1,3 +1,6 @@
 streamlit
 Pillow
 PyPDF2
+streamlit-drawable-canvas
+reportlab
+pdfplumber
