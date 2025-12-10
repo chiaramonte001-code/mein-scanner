@@ -2,46 +2,42 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Scanner Pro")
+st.set_page_config(page_title="Scanner")
 
-# --- LOGIN BEREICH ---
-code = st.text_input("Passwort", type="password")
-
+# Login
+code = st.text_input("Code", type="password")
 if code != "PRO-2025":
-    st.error("Gesperrt. Code kaufen!")
+    st.warning("Gesperrt.")
     st.stop()
 
-st.success("Scanner läuft!")
+st.success("Scanner bereit!")
 
-# --- START BUTTON ---
-if st.button("Start"):
+if st.button("Starten"):
     # Daten laden
     url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
-        "vs_currency": "usd",
-        "order": "market_cap_desc",
-        "per_page": 10,
+        "vs_currency": "usd", 
+        "order": "market_cap_desc", 
+        "per_page": 20, 
         "page": 1
     }
     
     try:
-        response = requests.get(url, params=params)
-        data = response.json()
+        r = requests.get(url, params=params)
+        data = r.json()
         
-        # Liste vorbereiten
-        clean_data = []
+        # TRICK: Wir werfen die Daten direkt in die Tabelle (ohne Schleife!)
+        df = pd.DataFrame(data)
         
-        # Schleife durch die Daten
-        for coin in 
-            clean_data.append({
-                "Name": coin['name'],
-                "Preis": coin['current_price'],
-                "Trend": coin['price_change_percentage_24h']
-            })
-            
-        # Tabelle anzeigen
-        st.dataframe(pd.DataFrame(clean_data))
+        # Wir zeigen nur die wichtigen Spalten an
+        simple_df = df[['name', 'current_price', 'price_change_percentage_24h', 'total_volume']]
+        
+        # Spalten umbenennen für schöne Optik
+        simple_df.columns = ['Name', 'Preis ($)', 'Trend (24h %)', 'Volumen']
+        
+        st.subheader("Markt Daten")
+        st.dataframe(simple_df)
         
     except Exception as e:
-        st.error("Fehler beim Laden der Daten.")
+        st.error("Fehler.")
         st.write(e)
