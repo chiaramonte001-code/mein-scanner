@@ -8,7 +8,7 @@ BEZAHL_LINK = "https://paypal.me/DEINNAME/5"
 
 st.set_page_config(page_title="Crypto AI Scanner", page_icon="⚡", layout="wide")
 
-# --- SIDEBAR (LOGIN) ---
+# --- LOGIN ---
 with st.sidebar:
     st.header("🔐 Login")
     passwort = st.text_input("Code eingeben:", type="password")
@@ -16,7 +16,6 @@ with st.sidebar:
     if passwort != GEHEIM_CODE:
         st.warning("Zugriff verweigert")
         st.markdown(f"👉 **[Zugang kaufen (5 CHF)]({BEZAHL_LINK})**")
-        st.info("Features:\n- 50+ Coins Scan\n- KI Kauf-Signale\n- Arbitrage Finder")
         st.stop()
     else:
         st.success("Pro-Modus Aktiv")
@@ -26,62 +25,58 @@ st.title("⚡ Crypto AI Scanner Pro")
 st.markdown("Scanne den gesamten Markt nach unterbewerteten Coins.")
 
 if st.button("🚀 JETZT SCANNEN"):
-    with st.spinner("Lade Live-Daten von 50 Börsen..."):
+    with st.spinner("Lade Live-Daten..."):
         try:
-            # 1. Daten holen (Top 50 Coins)
+            # 1. Daten holen
             url = "https://api.coingecko.com/api/v3/coins/markets"
             params = {
                 "vs_currency": "usd",
                 "order": "market_cap_desc",
-                "per_page": 50,
+                "per_page": 20,
                 "page": 1,
                 "sparkline": "false"
             }
-            res = requests.get(url, params=params, timeout=10)
-            data = res.json()
+            # Timeout erhöht für Stabilität
+            res = requests.get(url, params=params, timeout=15)
             
-            # 2. Daten verarbeiten
-            results = []
-            for coin in 
-                # Einfache "KI" Logik für Signale
-                change_24h = coin['price_change_percentage_24h']
-                signal = "⚪ NEUTRAL"
-                
-                if change_24h < -5:
-                    signal = "🟢 STRONG BUY (Dip)"
-                elif change_24h < -2:
-                    signal = "🟢 BUY"
-                elif change_24h > 5:
-                    signal = "🔴 STRONG SELL (Top)"
-                elif change_24h > 2:
-                    signal = "🔴 SELL"
-                
-                results.append({
-                    "Coin": coin['name'],
-                    "Symbol": coin['symbol'].upper(),
-                    "Preis ($)": coin['current_price'],
-                    "24h Änderung": f"{change_24h:.2f}%",
-                    "SIGNAL": signal,
-                    "Volumen": f"{coin['total_volume'] / 1000000:.1f} Mio"
-                })
-
-            # 3. Tabelle erstellen
-            df = pd.DataFrame(results)
-            
-            # 4. TOP EMPFEHLUNGEN (Die besten Dips)
-            st.subheader("💎 Top Kauf-Empfehlungen (Dips)")
-            best_buys = df[df["SIGNAL"].str.contains("BUY")]
-            if not best_buys.empty:
-                st.dataframe(best_buys.style.applymap(lambda x: 'color: green' if 'BUY' in str(x) else '', subset=['SIGNAL']))
+            if res.status_code != 200:
+                st.error(f"API Fehler: {res.status_code}. Versuche es in 1 Minute erneut.")
             else:
-                st.write("Aktuell keine starken Kauf-Signale.")
+                data = res.json()
+                
+                # 2. Daten verarbeiten
+                results = []
+                for coin in 
+                    # Signal Logik
+                    change = coin.get('price_change_percentage_24h', 0)
+                    if change is None: change = 0
+                    
+                    signal = "⚪ NEUTRAL"
+                    if change < -5:
+                        signal = "🟢 STRONG BUY"
+                    elif change < -2:
+                        signal = "🟢 BUY"
+                    elif change > 5:
+                        signal = "🔴 STRONG SELL"
+                    elif change > 2:
+                        signal = "🔴 SELL"
+                    
+                    results.append({
+                        "Coin": coin['name'],
+                        "Preis ($)": coin['current_price'],
+                        "24h %": f"{change:.2f}%",
+                        "SIGNAL": signal
+                    })
 
-            # 5. GANZE LISTE
-            st.subheader("📋 Alle Coins im Vergleich")
-            st.dataframe(df)
+                # 3. Tabelle anzeigen
+                df = pd.DataFrame(results)
+                
+                # Beste Signale filtern
+                st.subheader("💎 Beste Signale")
+                st.dataframe(df)
 
         except Exception as e:
-            st.error(f"Fehler beim Scannen: {e}")
+            st.error(f"Ein Fehler ist aufgetreten: {e}")
 
 else:
-    st.info("Klicke auf den Button, um die Analyse zu starten.")
+    st.info("Klicke den Button zum Starten.")
